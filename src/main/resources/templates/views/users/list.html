@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="http://thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+<h1>List User</h1>
+<table>
+    <thead>
+    <tr>
+        <th> Roll Number</th>
+        <th> Full Name</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:if="${userPageable.empty}">
+        <td colspan="2"> No Books Available</td>
+    </tr>
+    <tr th:each="student : ${userPageable}">
+        <td><span th:text="${user.rollNumber}"> Roll Number </span></td>
+        <td><span th:text="${user.fullName}"> Full Name </span></td>
+    </tr>
+    </tbody>
+</table>
+</body>
+</html>
