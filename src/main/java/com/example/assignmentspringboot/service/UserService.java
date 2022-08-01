@@ -1,25 +1,95 @@
 package com.example.assignmentspringboot.service;
 
+import com.example.assignmentspringboot.entity.Credential;
 import com.example.assignmentspringboot.entity.User;
+import com.example.assignmentspringboot.entity.dto.UserLoginDto;
+import com.example.assignmentspringboot.entity.dto.UserRegisterDto;
+import com.example.assignmentspringboot.entity.enums.UserRole;
+import com.example.assignmentspringboot.entity.enums.UserStatus;
 import com.example.assignmentspringboot.repository.UserRepository;
+import com.example.assignmentspringboot.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
-public class UserService {
-
+public class UserService implements UserDetailsService {
     final UserRepository userRepository;
-    public User save(User user) {
-        return userRepository.save(user);
+    final PasswordEncoder passwordEncoder;
+
+    public UserRegisterDto register(UserRegisterDto userRegisterDto) {
+        Optional<User> optionalUser = userRepository.findUserByUsername(userRegisterDto.getUsername());
+        if (optionalUser.isPresent()) {
+            return null;
+        }
+        User user = User.builder()
+                .fullName(userRegisterDto.getFullName())
+                .email(userRegisterDto.getEmail())
+                .phone(userRegisterDto.getPhone())
+                .address(userRegisterDto.getAddress())
+                .avatar(userRegisterDto.getAvatar())
+                .username(userRegisterDto.getUsername())
+                .role(UserRole.USER)
+                .status(UserStatus.ACTIVE)
+                .password(passwordEncoder.encode(userRegisterDto.getPassword()))
+                .build();
+        userRepository.save(user);
+        UserRegisterDto userDto = UserRegisterDto.builder()
+                .fullName(userRegisterDto.getFullName())
+                .email(userRegisterDto.getEmail())
+                .phone(userRegisterDto.getPhone())
+                .address(userRegisterDto.getAddress())
+                .avatar(userRegisterDto.getAvatar())
+                .username(userRegisterDto.getUsername())
+                .role(UserRole.USER)
+                .id(user.getId())
+                .build();
+        return userDto;
     }
 
-    public Page<User> findAll(int page, int limit) {
-        return userRepository.findAll(PageRequest.of(page - 1, limit, Sort.by(Sort.Direction.ASC, "name")));
+    public Credential login(UserLoginDto userLoginDto) {
+        User user = (User) loadUserByUsername(userLoginDto.getUsername());
+        boolean isMatched = passwordEncoder.matches(userLoginDto.getPassword(), user.getPassword());
+        Optional<User> optionalUser = userRepository.findUserByUsername(userLoginDto.getUsername());
+        if(optionalUser.isPresent()) {
+            User optionUser = optionalUser.get();
+            int expiredAfterDay = 7;
+            String accessToken = JwtUtil.generateTokenV2(optionUser, expiredAfterDay );
+            String refreshToken = JwtUtil.generateTokenV2(optionUser, 14);
+            return Credential.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .expiredAt(System.currentTimeMillis() + expiredAfterDay * 24 * 60 * 60 * 60)
+                    .scope("basic_user_info")
+                    .build();
+        }
+        throw  new UsernameNotFoundException("User not found");
+      /*  if(isMatched) {
+            JwtUtil.generateToken(user.get);
+        }*/
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        Optional<User> optionalUser = userRepository.findUserByUsername(username);
+        if (!optionalUser.isPresent()) {
+            throw new UsernameNotFoundException("User not found");
+        }
+        User user = optionalUser.get();
+        List<GrantedAuthority> grantedAuthorityList = new ArrayList<>();
+        SimpleGrantedAuthority simpleGrantedAuthority = new SimpleGrantedAuthority(user.getRole() == UserRole.ADMIN ? "ADMIN" : "USER");
+        grantedAuthorityList.add(simpleGrantedAuthority);
+        return new org.springframework.security.core.userdetails.User(user.getUsername(), user.getPassword(), grantedAuthorityList);
+//        return new MyUserPrincipal(user.get());
     }
 }
